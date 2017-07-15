@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:batch="http://www.springframework.org/schema/batch"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/batch
+		http://www.springframework.org/schema/batch/spring-batch.xsd
+		http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/jdbc
+        http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+        http://www.springframework.org/schema/task
+        http://www.springframework.org/schema/task/spring-task.xsd">
+    <context:component-scan base-package="com.tugrulaslan.batch"/>
+    <bean id="transactionManager"
+          class="org.springframework.batch.support.transaction.ResourcelessTransactionManager"/>
+    <bean id="dataSource"
+          class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://localhost:3306/batchdb"/>
+        <property name="username" value="root"/>
+        <property name="password" value="root"/>
+    </bean>
+
+    <bean id="jobRepository"
+          class="org.springframework.batch.core.repository.support.JobRepositoryFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="transactionManager" ref="transactionManager"/>
+        <property name="databaseType" value="mysql"/>
+    </bean>
+
+    <bean id="jobLauncher"
+          class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+        <property name="jobRepository" ref="jobRepository"/>
+    </bean>
+
+    <batch:job id="job1" job-repository="jobRepository">
+        <batch:step id="jobstep1" allow-start-if-complete="true">
+            <batch:tasklet>
+                <batch:chunk reader="jobstep1Reader" writer="jobstep1Writer" commit-interval="1"></batch:chunk>
+            </batch:tasklet>
+        </batch:step>
+    </batch:job>
+
+    <!-- Custom Job Step Reader and Writer -->
+    <!-- scope on reader will allow it to fetch the data again,
+    whereas the default scope prototype doesn't. -->
+    <bean id="jobstep1Reader" class="com.tugrulaslan.batch.JobStep1Reader" scope="step"/>
+    <bean id="jobstep1Writer" class="com.tugrulaslan.batch.JobStep1Writer"/>
+
+
+    <!-- Batch Job Scheduler Settings -->
+    <bean id="jobScheduler" class="com.tugrulaslan.batch.JobScheduler"/>
+    <!-- The task will kick off every 5 seconds -->
+    <task:scheduled-tasks>
+        <task:scheduled ref="jobScheduler" method="run" cron="*/5 * * * * *"/>
+    </task:scheduled-tasks>
+
+
+    <!-- Testing jobs and steps -->
+    <bean class="org.springframework.batch.test.JobLauncherTestUtils"/>
+
+    <!-- Dropping and Creating Batch Database Structure -->
+    <jdbc:initialize-database data-source="dataSource">
+        <jdbc:script location="org/springframework/batch/core/schema-drop-mysql.sql"/>
+        <jdbc:script location="org/springframework/batch/core/schema-mysql.sql"/>
+    </jdbc:initialize-database>
+
+</beans>
